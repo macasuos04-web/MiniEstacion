@@ -92,11 +92,21 @@ class MiniEstacion(QMainWindow):
         self.worker.start()
         self.log.append(f"Conectado a {port}")
 
+    
     def desconectar(self):
         if self.worker:
-            self.worker.stop()
-        self.log.append("Desconectado")
-
+            try:
+                self.worker.stop()
+                if self.worker.serial_conn and self.worker.serial_conn.is_open:
+                    self.worker.serial_conn.close()
+                self.log.append("Desconectado correctamente.")
+            except Exception as e:
+                self.log.append(f"Error al desconectar: {e}")
+            finally:
+                self.worker = None
+        else:
+            self.log.append("No hay conexión activa.")
+            
     # --- Procesar datos recibidos ---
     def procesar_dato(self, data):
         self.log.append(f"< {data}")
@@ -108,10 +118,12 @@ class MiniEstacion(QMainWindow):
                 self.progress.setValue(valor)
 
                 # Comparar con el umbral
-                if valor > self.umbral:
+                if valor > self.umbral and not self.alerta_activa:
+                    self.alerta_activa = True
                     self.progress.setStyleSheet("QProgressBar::chunk {background-color: red;}")
                     QMessageBox.warning(self, "Alerta", "¡Humedad alta detectada!")
-                else:
+                elif valor <= self.umbral:
+                    self.alerta_activa = False
                     self.progress.setStyleSheet("")
             except:
                 pass
@@ -131,6 +143,7 @@ def simular_datos(hmi):
     """
     Simula lecturas del ESP32 y pulsaciones del botón.
     Genera valores de humedad y solicitudes aleatorias.
+
     """
     while True:
         valor = random.randint(20, 49)
@@ -147,6 +160,6 @@ if __name__ == "__main__":
     win.show()
 
     # Activar simulación (el hilo se ejecuta en segundo plano)
-    Thread(target=simular_datos, args=(win,), daemon=True).start()
+    #Thread(target=simular_datos, args=(win,), daemon=True).start()
 
     sys.exit(app.exec())
